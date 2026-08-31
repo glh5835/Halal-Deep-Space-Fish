@@ -1,0 +1,4 @@
+interface:
+  display_name: "自动去水印 (Remove AI Watermarks · Auto)"
+  short_description: "自动扫描工作区最近写入的文件并批量去除 AI 水印、来源标记与元数据；可在 Codex 中加载后每次写完代码自动清理"
+  default_prompt: "Use $remove-ai-watermarks to scan the workspace for recently written files and remove their AI watermarks automatically (Layer A), keeping .cleaned sidecars."
