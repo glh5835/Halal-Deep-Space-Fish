@@ -1,0 +1,4 @@
+1、打开power shell————运行 npm run dev
+2、打开任意浏览器，地址栏输入    http://localhost:5173
+千万不要双击直接运行 index.html，否则将会出现白屏
+3、rail_user_data是日志文件夹
