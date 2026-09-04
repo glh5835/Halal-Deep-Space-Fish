@@ -4,18 +4,34 @@ from models import SaleRecord
 from datetime import date
 from typing import List
 
-def create_sale(db: Session, sale_data):
+def _to_record(sale_data) -> SaleRecord:
     total = round(sale_data.unit_price * sale_data.quantity, 2)
     profit = round((sale_data.unit_price - sale_data.cost_price) * sale_data.quantity, 2)
-    db_sale = SaleRecord(
+    return SaleRecord(
         **sale_data.model_dump(),
         total_sales=total,
         profit=profit
     )
+
+def create_sale(db: Session, sale_data):
+    db_sale = _to_record(sale_data)
     db.add(db_sale)
     db.commit()
     db.refresh(db_sale)
     return db_sale
+
+def insert_sales_overwrite(db: Session, sales: list, covered_dates: list) -> int:
+    """覆盖式批量写入：先删 covered_dates 的旧数据，再一次 commit。
+
+    脏行应在调用前的校验阶段被拦下；这里抛出的只可能是数据库级异常，
+    由调用方负责 rollback。
+    """
+    if covered_dates:
+        db.query(SaleRecord).filter(SaleRecord.date.in_(covered_dates)) \
+            .delete(synchronize_session=False)
+    db.add_all(_to_record(s) for s in sales)
+    db.commit()
+    return len(sales)
 
 def get_daily_summary(db: Session, query_date: date):
     row = db.query(
