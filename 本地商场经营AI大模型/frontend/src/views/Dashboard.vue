@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 import api from '@/api'
+import { formatLocalDate } from '@/utils/date'
 
 const selectedDate = ref(new Date())
 const summary = ref({})
@@ -13,7 +14,7 @@ const chartDom = ref(null)
 let chartInstance = null
 
 async function loadData() {
-  const dateStr = selectedDate.value.toISOString().slice(0, 10)
+  const dateStr = formatLocalDate(selectedDate.value)
   try {
     summary.value = await api.getDailySummary(dateStr)
     const res = await api.getDailyAdvice(dateStr)

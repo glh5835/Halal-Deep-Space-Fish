@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Depends, HTTPException
+from fastapi import FastAPI, APIRouter, UploadFile, File, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 import pandas as pd
@@ -14,9 +14,10 @@ from ai_service import generate_advice
 app = FastAPI(title="商场AI经营分析系统")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-Base.metadata.create_all(bind=engine)
+# 统一 API 前缀，与前端 axios baseURL '/api' 对应
+api = APIRouter(prefix="/api")
 
-@app.post("/upload")
+@api.post("/upload")
 async def upload_sales(file: UploadFile = File(...), db: Session = Depends(get_db)):
     if not file.filename.endswith(('.xlsx', '.csv')):
         raise HTTPException(400, "仅支持 xlsx/csv 文件")
@@ -43,14 +44,14 @@ async def upload_sales(file: UploadFile = File(...), db: Session = Depends(get_d
             continue
     return {"message": f"成功导入 {count} 条记录"}
 
-@app.get("/summary/{query_date}")
+@api.get("/summary/{query_date}")
 def daily_summary(query_date: date, db: Session = Depends(get_db)):
     summary = get_daily_summary(db, query_date)
     if not summary:
         raise HTTPException(404, "该日期无数据")
     return summary
 
-@app.get("/advice/{query_date}")
+@api.get("/advice/{query_date}")
 def daily_advice(query_date: date, db: Session = Depends(get_db)):
     summary = get_daily_summary(db, query_date)
     if not summary:
@@ -60,6 +61,10 @@ def daily_advice(query_date: date, db: Session = Depends(get_db)):
     advice = generate_advice(summary, cat_str)
     return {"date": query_date, "suggestions": advice}
 
-@app.get("/dates")
+@api.get("/dates")
 def available_dates(db: Session = Depends(get_db)):
     return get_latest_dates(db)
+
+app.include_router(api)
+
+Base.metadata.create_all(bind=engine)
