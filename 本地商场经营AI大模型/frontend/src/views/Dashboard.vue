@@ -5,12 +5,16 @@ import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 import api from '@/api'
+import { ElMessage } from 'element-plus'
 import { formatLocalDate } from '@/utils/date'
 
 const selectedDate = ref(new Date())
 const summary = ref({})
 const suggestions = ref([])
 const chartDom = ref(null)
+const reportDom = ref(null)
+const exportingPdf = ref(false)
+const exportingExcel = ref(false)
 let chartInstance = null
 
 async function loadData() {
@@ -60,35 +64,65 @@ function initChart() {
 }
 
 function exportExcel() {
-  if (!summary.value.date) return
-  const data = [
-    ['日期', '总销售额', '总成本', '总毛利', '毛利率(%)', '记录数'],
-    [
-      summary.value.date,
-      summary.value.total_sales,
-      summary.value.total_cost,
-      summary.value.total_profit,
-      summary.value.margin,
-      summary.value.record_count
+  if (!summary.value.date || exportingExcel.value) return
+  exportingExcel.value = true
+  try {
+    const data = [
+      ['日期', '总销售额', '总成本', '总毛利', '毛利率(%)', '记录数'],
+      [
+        summary.value.date,
+        summary.value.total_sales,
+        summary.value.total_cost,
+        summary.value.total_profit,
+        summary.value.margin,
+        summary.value.record_count
+      ]
     ]
-  ]
-  const ws = XLSX.utils.aoa_to_sheet(data)
-  const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, '汇总')
-  XLSX.writeFile(wb, `经营汇总_${summary.value.date}.xlsx`)
+    const ws = XLSX.utils.aoa_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, '汇总')
+    XLSX.writeFile(wb, `经营汇总_${summary.value.date}.xlsx`)
+  } catch (e) {
+    ElMessage.error('Excel 导出失败：' + e.message)
+  } finally {
+    exportingExcel.value = false
+  }
 }
 
 async function exportPDF() {
-  if (!chartDom.value) return
-  const canvas = await html2canvas(chartDom.value)
-  const imgData = canvas.toDataURL('image/png')
-  const pdf = new jsPDF()
-  pdf.addImage(imgData, 'PNG', 10, 10, 190, 100)
-  pdf.text(`日期: ${summary.value.date || ''}`, 10, 120)
-  pdf.text(`销售额: ${summary.value.total_sales || 0} 元`, 10, 130)
-  pdf.text(`毛利: ${summary.value.total_profit || 0} 元`, 10, 140)
-  pdf.text(`毛利率: ${summary.value.margin || 0}%`, 10, 150)
-  pdf.save(`经营报表_${summary.value.date || 'report'}.pdf`)
+  if (!reportDom.value || exportingPdf.value) return
+  exportingPdf.value = true
+  try {
+    // 关掉 ECharts 入场动画，避免截到半截柱子
+    if (chartInstance) chartInstance.setOption({ animation: false })
+    await nextTick()
+    const canvas = await html2canvas(reportDom.value, {
+      backgroundColor: '#ffffff',
+      scale: 2,
+      useCORS: true,
+      scrollY: -window.scrollY
+    })
+    const imgData = canvas.toDataURL('image/png')
+    // jsPDF 默认 a4 尺寸、mm 单位：页面 210x297，左右留 10mm，内容宽 190mm
+    const pdf = new jsPDF()
+    const imgWidth = 190
+    const imgHeight = (canvas.height * imgWidth) / canvas.width
+    const contentHeight = 277 // 297 - 上下各 10mm
+    pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight)
+    let remaining = imgHeight - contentHeight
+    let offset = contentHeight
+    while (remaining > 0) {
+      pdf.addPage()
+      pdf.addImage(imgData, 'PNG', 10, 10 - offset, imgWidth, imgHeight)
+      offset += contentHeight
+      remaining -= contentHeight
+    }
+    pdf.save(`经营报表_${summary.value.date || 'report'}.pdf`)
+  } catch (e) {
+    ElMessage.error('PDF 导出失败：' + e.message)
+  } finally {
+    exportingPdf.value = false
+  }
 }
 
 onMounted(() => {
@@ -98,7 +132,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="dashboard">
+  <div class="dashboard" ref="reportDom">
     <h2>经营仪表盘</h2>
 
     <div class="toolbar">
@@ -108,10 +142,10 @@ onMounted(() => {
         placeholder="选择日期"
         @change="loadData"
       />
-      <el-button type="primary" @click="exportExcel" :disabled="!summary.date">
+      <el-button type="primary" @click="exportExcel" :loading="exportingExcel" :disabled="!summary.date">
         导出 Excel
       </el-button>
-      <el-button type="success" @click="exportPDF" :disabled="!summary.date">
+      <el-button type="success" @click="exportPDF" :loading="exportingPdf" :disabled="!summary.date">
         导出 PDF
       </el-button>
     </div>
