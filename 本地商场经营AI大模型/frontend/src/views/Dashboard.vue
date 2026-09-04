@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
@@ -10,37 +10,26 @@ import { formatLocalDate } from '@/utils/date'
 
 const selectedDate = ref(new Date())
 const summary = ref({})
+const categories = ref([])
+const trend = ref([])
 const suggestions = ref([])
+const adviceLoading = ref(false)
+const adviceWarning = ref('')
+const regenerating = ref(false)
 const chartDom = ref(null)
+const pieDom = ref(null)
+const trendDom = ref(null)
 const reportDom = ref(null)
 const exportingPdf = ref(false)
 const exportingExcel = ref(false)
-let chartInstance = null
+let barChart = null
+let pieChart = null
+let trendChart = null
 
-async function loadData() {
-  const dateStr = formatLocalDate(selectedDate.value)
-  try {
-    summary.value = await api.getDailySummary(dateStr)
-    const res = await api.getDailyAdvice(dateStr)
-    suggestions.value = res.suggestions || []
-    await nextTick()
-    initChart()
-  } catch (e) {
-    console.error(e)
-    summary.value = {}
-    suggestions.value = []
-    if (chartInstance) {
-      chartInstance.clear()
-    }
-  }
-}
-
-function initChart() {
+function renderBar() {
   if (!chartDom.value) return
-  if (!chartInstance) {
-    chartInstance = echarts.init(chartDom.value)
-  }
-  const option = {
+  if (!barChart) barChart = echarts.init(chartDom.value)
+  barChart.setOption({
     title: { text: '当日经营概览', left: 'center' },
     tooltip: { trigger: 'axis' },
     xAxis: { type: 'category', data: ['销售额', '成本', '毛利'] },
@@ -59,8 +48,114 @@ function initChart() {
         }
       }
     }]
+  }, true)
+}
+
+function renderPie() {
+  if (!pieDom.value) return
+  if (!pieChart) pieChart = echarts.init(pieDom.value)
+  pieChart.setOption({
+    title: { text: '品类销售占比', left: 'center' },
+    tooltip: { trigger: 'item', formatter: '{b}: ¥{c}（{d}%）' },
+    legend: { type: 'scroll', bottom: 0 },
+    series: [{
+      type: 'pie',
+      radius: ['35%', '65%'],
+      data: categories.value.map((c) => ({ name: c.category, value: c.sales })),
+      label: { formatter: '{b}\n{d}%' }
+    }]
+  }, true)
+}
+
+function renderTrend() {
+  if (!trendDom.value) return
+  if (!trendChart) trendChart = echarts.init(trendDom.value)
+  trendChart.setOption({
+    title: { text: '近30天销售趋势', left: 'center' },
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['销售额', '毛利率'], bottom: 0 },
+    grid: { top: 50, left: 70, right: 70, bottom: 70 },
+    xAxis: { type: 'category', data: trend.value.map((t) => t.date.slice(5)) },
+    yAxis: [
+      { type: 'value', name: '销售额(元)' },
+      { type: 'value', name: '毛利率(%)', axisLabel: { formatter: '{value}%' } }
+    ],
+    series: [
+      {
+        name: '销售额', type: 'bar', data: trend.value.map((t) => t.total_sales),
+        itemStyle: { color: '#5470c6' }
+      },
+      {
+        name: '毛利率', type: 'line', yAxisIndex: 1, smooth: true,
+        data: trend.value.map((t) => t.margin), itemStyle: { color: '#91cc75' }
+      }
+    ]
+  }, true)
+}
+
+function renderCharts() {
+  renderBar()
+  renderPie()
+  renderTrend()
+}
+
+function clearCharts() {
+  barChart?.clear()
+  pieChart?.clear()
+  trendChart?.clear()
+}
+
+// 汇总/品类/趋势并行加载，先画图；AI 建议单独异步加载，不阻塞图表
+async function loadData() {
+  const dateStr = formatLocalDate(selectedDate.value)
+  const [sumRes, catRes, trendRes] = await Promise.allSettled([
+    api.getDailySummary(dateStr),
+    api.getCategories(dateStr),
+    api.getTrend(30)
+  ])
+  summary.value = sumRes.status === 'fulfilled' ? sumRes.value : {}
+  categories.value = catRes.status === 'fulfilled' ? catRes.value : []
+  trend.value = trendRes.status === 'fulfilled' ? trendRes.value : []
+  await nextTick()
+  if (!summary.value.date) {
+    clearCharts()
+    suggestions.value = []
+    adviceWarning.value = ''
+    return
   }
-  chartInstance.setOption(option, true)
+  renderCharts()
+  loadAdvice()
+}
+
+async function loadAdvice() {
+  const dateStr = formatLocalDate(selectedDate.value)
+  adviceLoading.value = true
+  adviceWarning.value = ''
+  try {
+    const res = await api.getDailyAdvice(dateStr)
+    suggestions.value = res.suggestions || []
+    adviceWarning.value = res.warning || ''
+  } catch (e) {
+    suggestions.value = []
+    adviceWarning.value = 'AI 建议加载失败：' + e.message
+  } finally {
+    adviceLoading.value = false
+  }
+}
+
+async function regenerate() {
+  const dateStr = formatLocalDate(selectedDate.value)
+  regenerating.value = true
+  try {
+    const res = await api.regenerateAdvice(dateStr)
+    suggestions.value = res.suggestions || []
+    adviceWarning.value = res.warning || ''
+    ElMessage.success('已重新生成')
+  } catch (e) {
+    adviceWarning.value = '重新生成失败：' + e.message
+  } finally {
+    regenerating.value = false
+  }
 }
 
 function exportExcel() {
@@ -94,7 +189,7 @@ async function exportPDF() {
   exportingPdf.value = true
   try {
     // 关掉 ECharts 入场动画，避免截到半截柱子
-    if (chartInstance) chartInstance.setOption({ animation: false })
+    ;[barChart, pieChart, trendChart].forEach((c) => c && c.setOption({ animation: false }))
     await nextTick()
     const canvas = await html2canvas(reportDom.value, {
       backgroundColor: '#ffffff',
@@ -127,7 +222,11 @@ async function exportPDF() {
 
 onMounted(() => {
   loadData()
-  window.addEventListener('resize', () => chartInstance?.resize())
+  window.addEventListener('resize', () => {
+    barChart?.resize()
+    pieChart?.resize()
+    trendChart?.resize()
+  })
 })
 </script>
 
@@ -177,15 +276,49 @@ onMounted(() => {
       </el-col>
     </el-row>
 
+    <el-row :gutter="20" style="margin-top: 20px">
+      <el-col :span="12">
+        <el-card>
+          <div ref="chartDom" style="width: 100%; height: 350px"></div>
+        </el-card>
+      </el-col>
+      <el-col :span="12">
+        <el-card>
+          <div ref="pieDom" style="width: 100%; height: 350px"></div>
+        </el-card>
+      </el-col>
+    </el-row>
+
     <el-card style="margin-top: 20px">
-      <div ref="chartDom" style="width: 100%; height: 350px"></div>
+      <div ref="trendDom" style="width: 100%; height: 320px"></div>
     </el-card>
 
-    <el-card v-if="suggestions.length" style="margin-top: 20px">
+    <el-card style="margin-top: 20px">
       <template #header>
-        <span>AI 运营建议</span>
+        <div class="advice-header">
+          <span>AI 运营建议</span>
+          <el-tag v-if="summary.date && adviceWarning" type="info" size="small">数据日期 {{ summary.date }}</el-tag>
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            :loading="regenerating"
+            :disabled="!summary.date"
+            @click="regenerate"
+          >
+            重新生成
+          </el-button>
+        </div>
       </template>
-      <el-timeline>
+      <el-alert
+        v-if="adviceWarning"
+        :title="adviceWarning"
+        type="warning"
+        :closable="false"
+        style="margin-bottom: 12px"
+      />
+      <el-skeleton v-if="adviceLoading" :rows="5" animated />
+      <el-timeline v-else-if="suggestions.length">
         <el-timeline-item
           v-for="(s, i) in suggestions"
           :key="i"
@@ -197,9 +330,9 @@ onMounted(() => {
           <p><strong>预期效果：</strong>{{ s.effect }}</p>
         </el-timeline-item>
       </el-timeline>
+      <el-empty v-else-if="summary.date" description="暂无 AI 建议" />
+      <el-empty v-else description="该日期无数据" />
     </el-card>
-
-    <el-empty v-else-if="summary.date" description="该日期暂无 AI 建议" style="margin-top: 20px" />
   </div>
 </template>
 
@@ -221,5 +354,14 @@ onMounted(() => {
   font-weight: bold;
   color: #333;
   margin-top: 8px;
+}
+.advice-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.advice-header span:first-child {
+  font-weight: bold;
 }
 </style>
