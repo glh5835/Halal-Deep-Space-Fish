@@ -1,4 +1,5 @@
 import json
+import time
 from datetime import date, datetime
 from io import BytesIO
 
@@ -9,6 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import inspect as sa_inspect, text
 from sqlalchemy.orm import Session
 
+from config import CORS_ORIGINS, MAX_UPLOAD_MB, OLLAMA_BASE_URL, OLLAMA_MODEL
+from logging_conf import logger
 from database import engine, get_db, Base
 from models import SaleRecord, ImportBatch
 from schemas import SaleCreate
@@ -21,7 +24,9 @@ from ai_service import generate_advice, OLLAMA_BASE_URL, OLLAMA_MODEL
 from utils_file import read_table, detect_mapping, apply_mapping, COLUMN_ALIASES
 
 app = FastAPI(title="商场AI经营分析系统")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+# 生产走 Nginx 同源反代；此处只放行本地开发地址，可用 CORS_ORIGINS 环境变量扩展
+app.add_middleware(CORSMiddleware, allow_origins=[o.strip() for o in CORS_ORIGINS.split(",")],
+                   allow_methods=["*"], allow_headers=["*"])
 
 # 统一 API 前缀，与前端 axios baseURL '/api' 对应
 api = APIRouter(prefix="/api")
@@ -86,6 +91,8 @@ def _read_upload_df(file: UploadFile):
     if not filename.lower().endswith((".xlsx", ".csv")):
         raise HTTPException(400, "仅支持 xlsx/csv 文件")
     content = file.file.read()
+    if len(content) > MAX_UPLOAD_MB * 1024 * 1024:
+        raise HTTPException(400, f"文件超过大小上限 {MAX_UPLOAD_MB}MB")
     try:
         df = read_table(content, filename)
     except Exception as e:
@@ -141,6 +148,7 @@ async def upload_sales(
     valid, errors = parse_rows(df)
     file_dates = sorted({s.date for s in valid})
     # 阶段三：批次记录与明细同一事务写入，拿到批次号后一次性 commit
+    _t0 = time.perf_counter()
     try:
         batch = ImportBatch(
             filename=filename, mode=mode, row_count=0,
@@ -157,11 +165,15 @@ async def upload_sales(
             inserted, skipped = insert_sales_append(db, valid, file_dates, batch_id=batch.id)
         batch.row_count = inserted
         db.commit()
-    except Exception as e:
+    except Exception:
         db.rollback()
-        raise HTTPException(500, f"数据库写入失败：{e}")
+        logger.exception("数据库写入失败 file=%s mode=%s", filename, mode)
+        raise HTTPException(500, f"数据库写入失败：请查看后端日志")
     if mode == "overwrite":
         clear_advice_cache(db, file_dates)  # 数据变了，受影响日期的建议缓存直接失效
+    logger.info("导入完成 file=%s mode=%s batch=%d total=%d success=%d skipped=%d failed=%d 耗时=%.1fs",
+                filename, mode, batch.id, len(df), inserted, skipped, len(df) - len(valid),
+                time.perf_counter() - _t0)
     return {
         "message": f"成功导入 {inserted} 条记录" + (f"，跳过重复 {skipped} 条" if skipped else ""),
         "total": len(df),
@@ -305,12 +317,17 @@ def daily_advice(query_date: date, db: Session = Depends(get_db)):
     summary = get_daily_summary(db, query_date)
     if not summary:
         raise HTTPException(404, "无数据")
+    _t0 = time.perf_counter()
     fp = data_fingerprint(summary["total_sales"], summary["record_count"], query_date)
     row = get_advice_row(db, query_date)
     if row and row.data_fingerprint == fp:  # 命中缓存：数据没变过，直接复用
+        logger.info("AI 建议 date=%s cached=True model=%s 耗时=%.2fs",
+                    query_date, row.model, time.perf_counter() - _t0)
         return _advice_payload(query_date, json.loads(row.suggestions or "[]"), True,
                                row.model, row.created_at, None)
     suggestions, warning = _generate_and_cache(db, summary, query_date)
+    logger.info("AI 建议 date=%s cached=False model=%s warning=%s 耗时=%.1fs",
+                query_date, OLLAMA_MODEL, warning, time.perf_counter() - _t0)
     return _advice_payload(query_date, suggestions, False, OLLAMA_MODEL, datetime.now(), warning)
 
 
@@ -319,7 +336,10 @@ def regenerate_advice(query_date: date, db: Session = Depends(get_db)):
     summary = get_daily_summary(db, query_date)
     if not summary:
         raise HTTPException(404, "无数据")
+    _t0 = time.perf_counter()
     suggestions, warning = _generate_and_cache(db, summary, query_date)
+    logger.info("AI 重新生成 date=%s model=%s warning=%s 耗时=%.1fs",
+                query_date, OLLAMA_MODEL, warning, time.perf_counter() - _t0)
     return _advice_payload(query_date, suggestions, False, OLLAMA_MODEL, datetime.now(), warning)
 
 

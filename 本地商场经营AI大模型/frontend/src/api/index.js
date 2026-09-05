@@ -2,7 +2,7 @@ import axios from 'axios'
 
 // 配置基础路径，开发环境代理到后端8000端口
 const apiClient = axios.create({
-  baseURL: '/api',          // 生产环境 nginx 反向代理，开发环境 vite proxy
+  baseURL: import.meta.env.VITE_API_BASE || '/api',  // 可用 VITE_API_BASE 覆盖，默认走代理
   timeout: 60000,           // AI建议生成可能较慢，适当延长
 })
 

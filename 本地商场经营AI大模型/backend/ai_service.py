@@ -1,13 +1,12 @@
 import json
-import os
 import re
+import time
 
 from langchain.prompts import PromptTemplate
 from langchain_community.llms import Ollama
 
-# 容器内连宿主机 Ollama 用 http://host.docker.internal:11434；本地裸跑用默认值即可
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:7b")
+from config import OLLAMA_BASE_URL, OLLAMA_MODEL
+from logging_conf import logger
 
 llm = Ollama(model=OLLAMA_MODEL, base_url=OLLAMA_BASE_URL)
 
@@ -63,11 +62,15 @@ def generate_advice(daily_data, category_data):
         "category_detail": str(category_data),
     }
     try:
+        t0 = time.perf_counter()
         data = _extract_json_array(_clean_output((_PROMPT | llm).invoke(variables)))
         if data is None:  # 重试一次，追加更强的输出约束
             strict = PromptTemplate.from_template(_PROMPT.template + _STRICT_SUFFIX) | llm
             data = _extract_json_array(_clean_output(strict.invoke(variables)))
+        logger.info("AI 生成 model=%s 解析成功=%s 耗时=%.1fs",
+                    OLLAMA_MODEL, data is not None, time.perf_counter() - t0)
     except Exception as e:
+        logger.exception("AI 调用失败 model=%s", OLLAMA_MODEL)
         return [], f"AI 服务调用失败：{e}"
     if data is None:
         return [], "模型输出解析失败，请稍后重试"
