@@ -1,0 +1,7 @@
+- insert:
+    - id: dsh-codex-product
+      name: dsh-codex-modes/product
+    - id: dsh-codex-collaboration
+      name: dsh-codex-modes/collaboration
+    - id: dsh-codex-sandbox
+      name: dsh-codex-modes/sandbox

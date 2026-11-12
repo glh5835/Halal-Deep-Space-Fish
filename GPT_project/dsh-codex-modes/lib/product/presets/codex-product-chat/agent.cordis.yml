@@ -1,0 +1,16 @@
+- id: agent-instructions
+  name: "@deepseek-ai/dsh-agent-instructions"
+- id: tool-fs
+  name: "@deepseek-ai/dsh-tool-fs"
+- id: tool-fs-search
+  name: "@deepseek-ai/dsh-tool-fs-search"
+- id: tool-web
+  name: "@deepseek-ai/dsh-tool-web"
+- id: tool-todo
+  name: "@deepseek-ai/dsh-tool-todo"
+- id: tool-bash
+  name: "@deepseek-ai/dsh-tool-bash"
+  disabled: !!js process.platform === "win32"
+- id: tool-pwsh
+  name: "@deepseek-ai/dsh-tool-pwsh"
+  disabled: !!js process.platform !== "win32"

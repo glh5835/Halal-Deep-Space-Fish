@@ -1,0 +1,47 @@
+export const modes = ['chat', 'work', 'codex']
+const dialogue = ['ask_user_question', 'exit_plan_mode']
+const web = ['web_search', 'web_fetch']
+const work = [...dialogue, ...web, 'read', 'read_image', 'glob', 'grep', 'write', 'edit', 'todo_write']
+
+export const products = {
+  chat: {
+    label: 'Chat',
+    description: 'Conversation, explanation and drafting.',
+    prefix: 'Chat. Answer questions, explain concepts and draft text. Ask for clarification when needed. Consult sources when the user asks for verification.',
+    tools: [...dialogue, ...web],
+  },
+  work: {
+    label: 'Work',
+    description: 'Research, workspace tasks and deliverables.',
+    prefix: 'Work. Establish the requested deliverable, gather evidence, perform the workspace task, and verify the result before reporting.',
+    tools: work,
+  },
+  codex: {
+    label: 'Codex',
+    description: 'Repository inspection, coding and verification.',
+    prefix: 'Codex. Read the repository instructions, inspect the relevant code, make a focused change, and run the narrowest useful verification.',
+    tools: [...work, 'bash', 'pwsh', 'apply_patch', 'str_replace_editor'],
+  },
+}
+
+export function parseMode(value) {
+  return modes.find(mode => mode === value)
+}
+
+export function presetMode(id) {
+  return modes.find(mode => 'codex-product-' + mode === id)
+}
+
+export function presetDefinitions(windows) {
+  const tools = ['fs', 'fs-search', 'web', 'todo', windows ? 'pwsh' : 'bash']
+  return modes.map((mode, index) => ({
+    id: 'codex-product-' + mode,
+    name: products[mode].label,
+    description: products[mode].description,
+    order: 10 + index,
+    plugins: [
+      { id: 'agent-instructions', name: '@deepseek-ai/dsh-agent-instructions' },
+      ...tools.map(tool => ({ id: 'tool-' + tool, name: '@deepseek-ai/dsh-tool-' + tool })),
+    ],
+  }))
+}

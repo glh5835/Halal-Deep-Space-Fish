@@ -1,0 +1,47 @@
+{
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": "^22.19.0 || >=24.9.0",
+    "dsh": ">=0.1.1-rc.2 <0.2.0-0 || >=0.1.2-0 <0.2.0-0 || >=0.1.5-0 <0.2.0-0 || >=0.1.6-0 <0.2.0-0 || >=0.1.7-0 <0.2.0-0 || >=0.2.0-0 <0.3.0-0 || >=0.2.1-0 <0.3.0-0 || >=0.2.2-0 <0.3.0-0"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh-plugin",
+    "cordis",
+    "codex"
+  ],
+  "name": "dsh-codex-collaboration",
+  "description": "Plan/Default switching with an execution-time read-only guard for DeepSeek Harness.",
+  "main": "./lib/collaboration/index.js",
+  "exports": {
+    ".": "./lib/collaboration/index.js",
+    "./package.json": "./package.json",
+    "./client": "./lib/collaboration/client.js"
+  },
+  "files": [
+    "lib",
+    "README.md",
+    "LICENSE",
+    "cordis.patch.yml"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-api-remotes"
+      ]
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/glh5835/Halal-Deep-Space-Fish.git",
+    "directory": "GPT_project/dsh-codex-modes/packages/collaboration"
+  }
+}

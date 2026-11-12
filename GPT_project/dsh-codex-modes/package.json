@@ -1,0 +1,54 @@
+{
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": "^22.19.0 || >=24.9.0",
+    "dsh": ">=0.1.1-rc.2 <0.2.0-0 || >=0.1.2-0 <0.2.0-0 || >=0.1.5-0 <0.2.0-0 || >=0.1.6-0 <0.2.0-0 || >=0.1.7-0 <0.2.0-0 || >=0.2.0-0 <0.3.0-0 || >=0.2.1-0 <0.3.0-0 || >=0.2.2-0 <0.3.0-0"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh-plugin",
+    "cordis",
+    "codex"
+  ],
+  "name": "dsh-codex-modes",
+  "description": "Three independent Codex-style layers for DeepSeek Harness.",
+  "exports": {
+    "./product": "./lib/product/index.js",
+    "./collaboration": "./lib/collaboration/index.js",
+    "./sandbox": "./lib/sandbox/index.js",
+    "./client": "./lib/collaboration/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "README.md",
+    "LICENSE",
+    "cordis.patch.yml",
+    "packages/*/README.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-api-remotes"
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node scripts/build.mjs --check && node --test tests/*.test.mjs",
+    "pack:all": "node scripts/pack.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/glh5835/Halal-Deep-Space-Fish.git",
+    "directory": "GPT_project/dsh-codex-modes"
+  }
+}
