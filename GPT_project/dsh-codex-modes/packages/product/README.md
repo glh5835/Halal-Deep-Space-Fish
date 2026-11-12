@@ -13,7 +13,7 @@ $package = Join-Path (Get-Location).Path 'dist\dsh-codex-product-0.1.0.tgz'
 dsh plugin --profile web add "$package"
 ```
 
-以上命令在解压后的项目根目录执行。也可从 GitHub 直接安装，命令为 `dsh plugin --profile web add "github:glh5835/Halal-Deep-Space-Fish#dsh-codex-modes&path:/GPT_project/dsh-codex-modes/packages/product"`。
+以上命令在解压后的项目根目录执行。也可从 GitHub 直接安装，命令为 `dsh plugin --profile web add "https://raw.githubusercontent.com/glh5835/Halal-Deep-Space-Fish/dsh-codex-modes/GPT_project/dsh-codex-modes/dist/dsh-codex-product-0.1.0.tgz"`。
 
 运行 `/product` 查看当前模式。会话空闲时用 `/product chat`、`/product work` 或 `/product codex` 切换。命令记录写入 DSH 会话日志，重开时从成功的切换记录恢复。已有轮次的工具记录保持可读。
 

@@ -7,7 +7,7 @@ $package = Join-Path (Get-Location).Path 'dist\dsh-codex-collaboration-0.1.0.tgz
 dsh plugin --profile web add "$package"
 ```
 
-以上命令在解压后的项目根目录执行。也可从 GitHub 直接安装，命令为 `dsh plugin --profile web add "github:glh5835/Halal-Deep-Space-Fish#dsh-codex-modes&path:/GPT_project/dsh-codex-modes/packages/collaboration"`。
+以上命令在解压后的项目根目录执行。也可从 GitHub 直接安装，命令为 `dsh plugin --profile web add "https://raw.githubusercontent.com/glh5835/Halal-Deep-Space-Fish/dsh-codex-modes/GPT_project/dsh-codex-modes/dist/dsh-codex-collaboration-0.1.0.tgz"`。
 
 支持插槽的 Web profile 在输入栏显示 Plan / Default 下拉。各版本均可使用以下命令。
 

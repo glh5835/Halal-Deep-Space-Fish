@@ -17,18 +17,18 @@ $package = Join-Path (Get-Location).Path 'dist\dsh-codex-modes-0.1.0.tgz'
 dsh plugin --profile web add "$package"
 ```
 
-四个安装包都在 `dist`。独立层也可通过相应 `.tgz` 的绝对路径安装。也可以使用下面的 GitHub 直装命令。
+四个安装包都在 `dist`。独立层也可通过相应 `.tgz` 的绝对路径安装。也可以通过下面的 GitHub 安装包地址直接安装。
 
 ```powershell
-dsh plugin --profile web add "github:glh5835/Halal-Deep-Space-Fish#dsh-codex-modes&path:/GPT_project/dsh-codex-modes"
+dsh plugin --profile web add "https://raw.githubusercontent.com/glh5835/Halal-Deep-Space-Fish/dsh-codex-modes/GPT_project/dsh-codex-modes/dist/dsh-codex-modes-0.1.0.tgz"
 ```
 
 按需安装单层时，从以下命令中选择。
 
 ```powershell
-dsh plugin --profile web add "github:glh5835/Halal-Deep-Space-Fish#dsh-codex-modes&path:/GPT_project/dsh-codex-modes/packages/product"
-dsh plugin --profile web add "github:glh5835/Halal-Deep-Space-Fish#dsh-codex-modes&path:/GPT_project/dsh-codex-modes/packages/collaboration"
-dsh plugin --profile web add "github:glh5835/Halal-Deep-Space-Fish#dsh-codex-modes&path:/GPT_project/dsh-codex-modes/packages/sandbox"
+dsh plugin --profile web add "https://raw.githubusercontent.com/glh5835/Halal-Deep-Space-Fish/dsh-codex-modes/GPT_project/dsh-codex-modes/dist/dsh-codex-product-0.1.0.tgz"
+dsh plugin --profile web add "https://raw.githubusercontent.com/glh5835/Halal-Deep-Space-Fish/dsh-codex-modes/GPT_project/dsh-codex-modes/dist/dsh-codex-collaboration-0.1.0.tgz"
+dsh plugin --profile web add "https://raw.githubusercontent.com/glh5835/Halal-Deep-Space-Fish/dsh-codex-modes/GPT_project/dsh-codex-modes/dist/dsh-codex-sandbox-0.1.0.tgz"
 ```
 
 本地源码安装也可传入对应包目录的绝对路径。三个单层包和组合包都包含已生成的 JavaScript。发布到 npm 后，可用 `dsh plugin --profile web add <包名>` 安装。
@@ -64,7 +64,7 @@ npm test
 npm run pack:all
 ```
 
-测试通过模拟 DSH 服务调用插件钩子，并检查预期文件是否写入。当前完成了模拟钩子测试，官方 DSH 实际装包、Web 下拉和模型接口联调待验证。以下命令可在隔离 profile 检查包是否被 DSH 发现。
+13 项测试已在 Windows 上通过，覆盖模拟 DSH 钩子与临时目录写入。组合包和三个独立包的 GitHub 安装地址已用 DSH 0.1.2-rc.1 在隔离 profile 验证，配置中均可识别对应插件行。Web 下拉和真实模型审查待联调。
 
 ```powershell
 dsh --version
